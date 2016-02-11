@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Set and Remove Markers</title>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        height: 70%;
+      }
+#floating-panel {
+  position: absolute;
+  top: 10px;
+  left: 25%;
+  z-index: 5;
+  background-color: #fff;
+  padding: 5px;
+  border: 1px solid #999;
+  text-align: center;
+  font-family: 'Roboto','sans-serif';
+  line-height: 30px;
+  padding-left: 10px;
+}
+
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div>
+      <h3 id="msg"></h3>
+      <div id="all-markers">
+        <ul id="marks" style="list-style: none">
+          
+        </ul>
+      </div>
+    </div>
+    <script>
+
+// In the following example, markers appear when the user clicks on the map.
+// The markers are stored in an array.
+// The user can then click an option to hide, show or delete the markers.
+var map;
+var new_marker = [];
+var markers = [];
+var remove_marker = [];
+var circle = [];
+var sv = 1;
+var dl = 2;
+var doc_id = [];
+var remove_id = [];
+var addr;
+var labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+var labelIndex = 0;
+
+function geocodeLatLng(geocoder, markee, labelIndex){
+        geocoder.geocode({'location': markee}, function(results, status){
+                if(status === google.maps.GeocoderStatus.OK){
+                  if(results[1]){
+                    addr = results[1].formatted_address;
+//                    console.log(addr);
+                      createLi(markee, labelIndex.toString());
+                  }
+                  else{
+                    window.alert("No result Found");
+                  }
+                }
+                  else{
+                      window.alert("Google Failed due to "+ status);
+                  }
+          });
+}
+
+function initMap() {
+  var prompt_pswd = prompt("Enter Password");
+  if(prompt_pswd == "RapidoMarkers"){
+
+        var haightAshbury = {lat: 12.9667, lng: 77.5667};
+
+        map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 12,
+          center: haightAshbury,
+          mapTypeId: google.maps.MapTypeId.TERRAIN
+        });
+
+        var geocoder = new google.maps.Geocoder;
+
+        downloadUrl("test.php", function(data) {
+              var xml = data.responseXML;
+              var l;
+            //--+---------- Permanent Markers (This should be visible always if any)--------
+              var setmarker = xml.documentElement.getElementsByTagName("setMarker");
+              for (var j = 0; j < setmarker.length; j++){
+                var markerPoint = new google.maps.LatLng(
+                    parseFloat(setmarker[j].getAttribute("mlat")),
+                    parseFloat(setmarker[j].getAttribute("mlng")));
+                var id = setmarker[j].getAttribute("id");
+      //          console.log(""+id);
+                  var l = labels[labelIndex++ % labels.length];
+                  var marker = new google.maps.Marker({
+                      map: map,
+                      position: markerPoint,
+                      label: l
+                  //icon: icon.icon
+                  });
+                  
+                  var m_circle = new google.maps.Circle({
+                     center: markerPoint,
+                     map: map,
+                     radius: 250,
+                     fillColor: '#ff00ff',
+                     strokeWeight: 0                
+                  });          
+                  doc_id.push(id);
+      //          console.log(doc_id);
+                  markers.push(marker);
+                  circle.push(m_circle);
+        //-----------Converting latlng into addresses
+                //geocodeLatLng(geocoder, markerPoint, labelIndex);
+                //while(typeof addr == 'undefined'){}
+            //    console.log(addr);
+              //  setTimeout(createLi(markerPoint, addr), 3000);
+        //-----------Creating <li> for each markers----------------
+                  createLi(markerPoint, l);
+              }
+          });
+        // This event listener will call addMarker() when the map is clicked.
+        map.addListener('click', function(event) {
+          addMarker(event.latLng);
+        });
+  }
+  else{
+    alert("You Are Not Authorized User");               
+  }
+}
+
+function createLi(markerPoint, addr) {
+  var str = markerPoint.toString().slice(1,-1).split(",");
+  var ul = document.getElementById("marks");
+  var li = document.createElement("li");
+  li.appendChild(document.createTextNode(addr));//str[0]+" "+str[1]));
+    var btn = document.createElement("input");
+  btn.setAttribute("type","button");
+  btn.setAttribute("value","Remove");
+  btn.setAttribute("data-lat", str[0].trim());
+  btn.setAttribute("data-long", str[1].trim());
+  btn.style.marginLeft = '30px';
+  btn.style.marginTop = '10px';
+  btn.addEventListener("click",removeParent, false);
+  li.appendChild(btn);
+  ul.appendChild(li);
+}
+
+function removeParent(e) {
+    var lat = e.target.getAttribute('data-lat');
+    var lng = e.target.getAttribute('data-long');
+    for(var i=0; i< markers.length; i++) {
+      if(lat === markers[i].position.lat().toString() && lng === markers[i].position.lng().toString()) {
+        remove_marker.push(markers[i]);
+        remove_id.push(doc_id[i]);
+        
+        markers[i].setMap(null);
+        circle[i].setMap(null);
+        delData(dl);
+        
+        doc_id.splice(i,1);
+        circle.splice(i,1);
+        markers.splice(i,1);
+        
+        e.target.parentNode.remove();
+        return;
+      }
+    }
+}
+
+function delData(mtd) {
+    var arr = [];
+      var la = remove_marker[0].position.lat();
+      var ln = remove_marker[0].position.lng();
+      var idd = remove_id[0];
+      arr.push({'lat': la, 'lng': ln, 'methd': mtd, 'id': idd}); 
+//    console.log(markers);
+      remove_id = [];
+      remove_marker = [];
+    var xmlhttp;
+    if (window.XMLHttpRequest) {
+        xmlhttp = new XMLHttpRequest();
+    } else {
+        // code for IE6, IE5
+        xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+    }
+    xmlhttp.onreadystatechange = function() {
+      if (xmlhttp.readyState == XMLHttpRequest.DONE ) {
+         if(xmlhttp.status == 200){
+             document.getElementById("msg").innerHTML = xmlhttp.responseText;
+         }
+         else {
+            document.getElementById("msg").innerHTML = "Error";
+         }
+      }
+    }
+    xmlhttp.open("POST", "saveMarker.php", true);
+    xmlhttp.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
+    xmlhttp.send(JSON.stringify(arr));
+}
+
+
+// Adds a marker to the map and push to the array.
+function addMarker(location) {
+  var marker = new google.maps.Marker({
+    position: location,
+    map: map,
+    label: ''+labelIndex
+  });
+
+  var circ = new google.maps.Circle({
+     center: location,
+     map: map,
+     radius: 250,
+     fillColor: '#ff00ff',
+     strokeWeight: 0
+  });
+//  var c = circ.bindTo('center', marker, 'position');
+  new_marker.push(marker);
+  //circle.push(circ);
+  sendData(sv);
+//  console.log(markers);
+//  console.log(c);
+//  createLi(location);  
+}
+
+function sendData(mtd) {
+    var arr = [];
+    for(var i = 0; i< new_marker.length; i++){
+      var la = new_marker[i].position.lat();
+      var ln = new_marker[i].position.lng();
+      if(mtd == 2){
+          arr.push({'lat': la, 'lng': ln, 'methd': mtd});
+      }
+    else{
+        arr.push({'lat': la, 'lng': ln, 'methd': mtd}); 
+    }
+    }
+    new_marker = [];
+//    console.log(markers);
+    var xmlhttp;
+    if (window.XMLHttpRequest) {
+        xmlhttp = new XMLHttpRequest();
+    } else {
+        // code for IE6, IE5
+        xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+    }
+    xmlhttp.onreadystatechange = function() {
+      if (xmlhttp.readyState == XMLHttpRequest.DONE ) {
+         if(xmlhttp.status == 200){
+             document.getElementById("msg").innerHTML = xmlhttp.responseText;
+         }
+         else {
+            document.getElementById("msg").innerHTML = "Error";
+         }
+      }
+    }
+    xmlhttp.open("POST", "saveMarker.php", true);
+    xmlhttp.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
+    xmlhttp.send(JSON.stringify(arr));
+}
+
+    function downloadUrl(url, callback) {
+      var request = window.ActiveXObject ?
+          new ActiveXObject('Microsoft.XMLHTTP') :
+          new XMLHttpRequest;
+
+      request.onreadystatechange = function() {
+        if (request.readyState == 4) {
+          request.onreadystatechange = doNothing;
+          callback(request, request.status);
+        }
+      };
+
+      request.open('GET', url, true);
+      request.send(null);
+    }
+
+    function doNothing() {}
+    </script>
+
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAKxNZMw0NfyqXpl8FgVVfGSKVR82LJ3V4&signed_in=true&callback=initMap"></script>
+  </body>
+</html>

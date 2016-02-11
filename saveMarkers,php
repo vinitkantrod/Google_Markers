@@ -1,0 +1,34 @@
+<?php
+
+require_once '../Models/ConDB.php';
+$db = new ConDB();
+
+$data = file_get_contents('php://input');
+
+$markers = $db->mongo->selectCollection('markers');
+
+$somearr = json_decode($data, true);
+
+$a = array('latitude' => $somearr[0]["lat"], 'longitude' => $somearr[0]["lng"]);
+
+if($somearr[0]['methd'] == '1'){
+
+		$markers->insert($a);
+
+		echo "marker saved";
+}
+elseif ($somearr[0]['methd'] == '2') {
+	
+		$id = $somearr[0]['id'];
+		$a_id = array("_id" => new MongoId($id));
+		$find_marker = $markers->find($a_id);
+		if($find_marker){
+			$markers->remove($a_id);
+			echo "Marker Deleted";
+		}	
+		else{
+			echo "Marker Not Found";
+		}
+}
+     
+?>
